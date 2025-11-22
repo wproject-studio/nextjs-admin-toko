@@ -1,3 +1,4 @@
+// app/admin/purchases/page.tsx
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
@@ -79,8 +80,8 @@ export default function PurchasesPage() {
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "staff";
 
-  const canCreatePurchase = isAdmin; // hanya admin
-  const canUpdatePurchase = isAdmin || isStaff; // admin + staff
+  const canCreatePurchase = isAdmin;
+  const canUpdatePurchase = isAdmin || isStaff;
 
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
@@ -105,7 +106,6 @@ export default function PurchasesPage() {
     quantity: "",
   });
 
-  // ====== Derived stats ======
   const totalPurchases = purchases.length;
   const totalRevenue = purchases.reduce(
     (sum, p) => sum + (p.status === "CONFIRMED" ? p.total_price : 0),
@@ -115,7 +115,6 @@ export default function PurchasesPage() {
     (p) => p.status === "CANCELLED"
   ).length;
 
-  // Load produk & pembelian
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -198,7 +197,6 @@ export default function PurchasesPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // ===== CREATE (hanya admin) =====
     if (!editingPurchase) {
       if (!canCreatePurchase) return;
 
@@ -303,7 +301,6 @@ export default function PurchasesPage() {
       return;
     }
 
-    // ===== UPDATE (EDIT) – hanya admin =====
     if (!isAdmin) return;
     const id = editingPurchase.id;
 
@@ -318,7 +315,6 @@ export default function PurchasesPage() {
     setSaving(true);
 
     try {
-      // Ambil pembelian lama dari DB
       const { data: fullPurchase, error: purErr } = await supabase
         .from("purchases")
         .select("id, product_id, quantity, status")
@@ -335,7 +331,6 @@ export default function PurchasesPage() {
       const status = fullPurchase.status as string;
       const productId = fullPurchase.product_id as number;
 
-      // Ambil harga produk
       const { data: product, error: productErr } = await supabase
         .from("products")
         .select("price")
@@ -351,7 +346,6 @@ export default function PurchasesPage() {
       const price = product.price as number;
       const totalPrice = price * newQuantity;
 
-      // Sesuaikan stok hanya jika status CONFIRMED
       if (status === "CONFIRMED") {
         const delta = newQuantity - oldQty;
 
@@ -377,7 +371,7 @@ export default function PurchasesPage() {
             return;
           }
 
-          const newStock = currentStock - delta; // delta bisa negatif (stok kembali)
+          const newStock = currentStock - delta;
           const { error: updStockErr } = await supabase
             .from("product_stock")
             .update({ quantity: newStock })
@@ -391,7 +385,6 @@ export default function PurchasesPage() {
         }
       }
 
-      // Update pembelian
       const { error: updPurchaseErr } = await supabase
         .from("purchases")
         .update({
@@ -407,7 +400,6 @@ export default function PurchasesPage() {
         return;
       }
 
-      // Update state lokal
       setPurchases((prev) =>
         prev.map((p) =>
           p.id === id
@@ -472,7 +464,6 @@ export default function PurchasesPage() {
         return;
       }
 
-      // Jika dari CONFIRMED -> CANCELLED, kembalikan stok
       if (prevStatus === "CONFIRMED" && newStatus === "CANCELLED") {
         const { data: stockRow, error: stockErr } = await supabase
           .from("product_stock")
