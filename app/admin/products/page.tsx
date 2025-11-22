@@ -1,6 +1,8 @@
+// app/admin/products/page.tsx
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { useAuth } from "@/components/AuthContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -57,13 +59,15 @@ type SupabaseProductRow = {
 };
 
 export default function ProductsPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "staff";
-  const canWriteProduct = isAdmin || isStaff; // Create + Update
+  const canWriteProduct = isAdmin || isStaff;
 
   const [products, setProducts] = useState<ProductWithStock[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,7 +91,16 @@ export default function ProductsPage() {
     stock: "",
   });
 
-  // ===== Stats =====
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        router.replace("/");
+      } else if (user.role !== "admin") {
+        router.replace("/admin");
+      }
+    }
+  }, [loading, user, router]);
+
   const totalProducts = products.length;
   const totalStock = products.reduce((sum, p) => sum + (p.stock ?? 0), 0);
   const avgPrice =
@@ -95,10 +108,9 @@ export default function ProductsPage() {
       ? products.reduce((sum, p) => sum + p.price, 0) / products.length
       : 0;
 
-  // Load produk + stok
   useEffect(() => {
     const fetchProducts = async () => {
-      setLoading(true);
+      setLoadingProducts(true);
       const { data, error } = await supabase
         .from("products")
         .select(
@@ -122,7 +134,7 @@ export default function ProductsPage() {
         setProducts(mapped);
       }
 
-      setLoading(false);
+      setLoadingProducts(false);
     };
 
     void fetchProducts();
@@ -168,7 +180,6 @@ export default function ProductsPage() {
     );
     if (!confirmDelete) return;
 
-    // hapus stok dulu
     const { error: stockErr } = await supabase
       .from("product_stock")
       .delete()
@@ -212,7 +223,6 @@ export default function ProductsPage() {
 
     try {
       if (form.id == null) {
-        // CREATE
         const { data, error } = await supabase
           .from("products")
           .insert({
@@ -254,7 +264,6 @@ export default function ProductsPage() {
           },
         ]);
       } else {
-        // UPDATE
         const id = form.id;
 
         const updateFields: {
@@ -330,12 +339,8 @@ export default function ProductsPage() {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="p-6 text-sm text-muted-foreground">
-        Harap login terlebih dahulu untuk mengakses halaman produk.
-      </div>
-    );
+  if (loading || !user || !isAdmin) {
+    return <div className="p-6 text-sm text-muted-foreground">Memuat...</div>;
   }
 
   return (
@@ -414,7 +419,7 @@ export default function ProductsPage() {
             </p>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {loadingProducts ? (
               <p className="text-xs text-muted-foreground">
                 Memuat data produk...
               </p>
@@ -468,7 +473,7 @@ export default function ProductsPage() {
                               <DropdownMenuLabel>Aksi</DropdownMenuLabel>
                               <DropdownMenuSeparator />
 
-                              {/* Edit: admin & staff */}
+                              {/* Edit: admin & staff (tapi staff nggak akan sampai sini karena guard admin di atas) */}
                               {canWriteProduct && (
                                 <DropdownMenuItem
                                   onClick={() => openEditDialog(p)}
